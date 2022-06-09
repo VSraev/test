@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  selector:
+    matchLabels:
+      run: nginx
+  replicas: 1
+  strategy: # стратегия обновления подов
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1 # обновлять по одному поду
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        run: nginx
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.22.0
+          ports:
+            - containerPort: 80
+          resources:
+            limits:
+              cpu: 250m # не понятно сколько это "значительно больше", сделал предположение что этого хватит
+              memory: 128Mi # по условию 128 должно хватать)
+            requests:
+              cpu: 100m # мин для работы
+              memory: 50Mi #
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15 # запускать пробу проверки работоспособности через 15 сек после инициализации пода
+            successThreshold: 1
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10 # запускать пробу готовности пода через 10 сек после инициализации пода
+            periodSeconds: 5
+            successThreshold: 1
+            failureThreshold: 1
+      affinity: # распределение подов по разным нодам, для отказоустойчивости!!
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: "run"
+                    operator: In
+                    values:
+                      - nginx
+              topologyKey: "kubernetes.io/hostname"
